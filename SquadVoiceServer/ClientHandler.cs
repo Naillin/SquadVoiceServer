@@ -26,7 +26,7 @@ namespace SquadVoiceServer
 		{
 			// Обрабатываем сообщения от клиента (текст и аудио)
 			Task.Run(() => HandleAudio());
-			Task.Run(() => HandleChat());
+			//Task.Run(() => HandleChat());
 		}
 
 		private void HandleAudio()
