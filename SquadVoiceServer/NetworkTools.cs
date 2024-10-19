@@ -9,19 +9,32 @@ namespace SquadVoiceServer
 {
 	internal class NetworkTools
 	{
-		public string getData(NetworkStream stream, int bufferSize)
-		{
-			byte[] buffer = new byte[bufferSize];
-			int bytesRead = stream.Read(buffer, 0, buffer.Length);
-			string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+		private NetworkStream _stream;
 
-			return message;
+		public NetworkTools(NetworkStream stream)
+		{
+			_stream = stream;
+		}
+		public string getData()
+		{
+			List<byte> buffer = new List<byte>();
+			byte[] tempBuffer = new byte[256];
+			int bytesRead;
+
+			do
+			{
+				bytesRead = _stream.Read(tempBuffer, 0, tempBuffer.Length);
+				buffer.AddRange(tempBuffer.Take(bytesRead));
+			}
+			while (_stream.DataAvailable);
+
+			return Encoding.UTF8.GetString(buffer.ToArray());
 		}
 
-		public void sendData(NetworkStream stream, string data)
+		public void sendData(string data)
 		{
 			byte[] messageBytes = Encoding.UTF8.GetBytes(data);
-			stream.Write(messageBytes, 0, messageBytes.Length);
+			_stream.Write(messageBytes, 0, messageBytes.Length);
 		}
 	}
 }

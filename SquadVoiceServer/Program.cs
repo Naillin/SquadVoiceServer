@@ -17,7 +17,6 @@ namespace SquadVoiceServer
 		private static int SERVER_PORT = 5656;
 		private static List<Channel> channels = new List<Channel>(); // Список всех каналов
 
-		Program program;
 		public static void Main(string[] args)
 		{
 			Program program = new Program();
@@ -46,16 +45,15 @@ namespace SquadVoiceServer
 
 		private static void HandleClient(TcpClient client)
 		{
+			NetworkStream stream = client.GetStream();
 			//АВТОРИЗАЦИЯ
 			//Загрузка базы данных пользователей
 			JSONTools jsonTools = new JSONTools();
 			UserDatabase userDatabase = jsonTools.LoadUsers();
+			NetworkTools networkTools = new NetworkTools(stream);
 			Program program = new Program();
-			NetworkTools networkTools = new NetworkTools();
 
-			NetworkStream stream = client.GetStream();
-
-			string loginPass = networkTools.getData(stream, 256);
+			string loginPass = networkTools.getData();
 			Console.WriteLine($"Попытка входа: {loginPass}");
 			// Простая проверка логина и пароля
 			string[] parts = loginPass.Split(':');
@@ -81,7 +79,9 @@ namespace SquadVoiceServer
 				return;
 			}
 
-			string channelName = networkTools.getData(stream, 256);
+			Console.WriteLine("Ожидание данных от клиента...");
+			string channelName = networkTools.getData();
+			Console.WriteLine($"Получено имя канала: {channelName}");
 			// Пример простого выбора канала
 			Channel selectedChannel = channels.FirstOrDefault(c => c.Name == channelName);
 			if (selectedChannel != null)
