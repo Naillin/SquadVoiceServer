@@ -26,7 +26,7 @@ namespace SquadVoiceServer
 		{
 			// Обрабатываем сообщения от клиента (текст и аудио)
 			Task.Run(() => HandleAudio());
-			//Task.Run(() => HandleChat());
+			Task.Run(() => HandleChat());
 		}
 
 		private void HandleAudio()
@@ -60,19 +60,20 @@ namespace SquadVoiceServer
 		{
 			try
 			{
-				NetworkStream stream = client.GetStream();
-				byte[] buffer = new byte[1024];
+				NetworkTools networkTools = new NetworkTools(client.GetStream());
+				//byte[] buffer = new byte[1024];
 				while (true)
 				{
-					int bytesRead = stream.Read(buffer, 0, buffer.Length);
-					if (bytesRead == 0)
-					{
-						// Клиент отключился
-						Console.WriteLine("Клиент отключился");
-						break;
-					}
+					//int bytesRead = stream.Read(buffer, 0, buffer.Length);
+					//if (bytesRead == 0)
+					//{
+					//	// Клиент отключился
+					//	Console.WriteLine("Клиент отключился");
+					//	break;
+					//}
 
-					string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+					//string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+					string message = networkTools.getData();
 					Console.WriteLine($"Получено сообщение: {message}");
 
 					// Рассылаем сообщение всем в канале
@@ -80,9 +81,10 @@ namespace SquadVoiceServer
 					{
 						if (user != client)
 						{
-							NetworkStream userStream = user.GetStream();
-							byte[] data = Encoding.UTF8.GetBytes(message);
-							userStream.Write(data, 0, data.Length);
+							NetworkTools networkToolsUser = new NetworkTools(user.GetStream());
+							networkToolsUser.sendData(message);
+							//byte[] data = Encoding.UTF8.GetBytes(message);
+							//userStream.Write(data, 0, data.Length);
 						}
 					}
 				}
@@ -111,5 +113,4 @@ namespace SquadVoiceServer
 			Console.WriteLine("Соединение с клиентом закрыто.");
 		}
 	}
-
 }
