@@ -11,15 +11,15 @@ namespace SquadVoiceServer
 {
 	internal class ClientHandler
 	{
-		private TcpClient client;
+		private CustomClient customClient;
 		private Channel channel;
 		private WaveInEvent waveSource;
 
-		public ClientHandler(TcpClient client, Channel channel)
+		public ClientHandler(CustomClient customClient, Channel channel)
 		{
-			this.client = client;
+			this.customClient = customClient;
 			this.channel = channel;
-			channel.ConnectedUsers.Add(client); // Добавляем пользователя в канал
+			channel.ConnectedUsers.Add(customClient); // Добавляем пользователя в канал
 		}
 
 		public void StartHandling()
@@ -38,11 +38,12 @@ namespace SquadVoiceServer
 				waveSource.DataAvailable += (sender, e) =>
 				{
 					// Рассылаем аудио всем пользователям в канале
-					foreach (var user in channel.ConnectedUsers)
+					foreach (CustomClient otherClients in channel.ConnectedUsers)
 					{
-						if (user != client) // Не отправляем аудио самому себе
+						TcpClient otherVoiceClient = otherClients.voiceClient;
+						if (otherVoiceClient != customClient.voiceClient) // Не отправляем аудио самому себе
 						{
-							NetworkStream stream = user.GetStream();
+							NetworkStream stream = otherVoiceClient.GetStream();
 							stream.Write(e.Buffer, 0, e.BytesRecorded);
 						}
 					}
@@ -51,7 +52,7 @@ namespace SquadVoiceServer
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"Ошибка при обработке аудио: {ex.Message}");
+				Console.WriteLine($"Ошибка при обработке аудио: {ex.Message}.");
 				StopHandling(); // Останавливаем обработку при ошибке
 			}
 		}
@@ -60,38 +61,27 @@ namespace SquadVoiceServer
 		{
 			try
 			{
-				NetworkTools networkTools = new NetworkTools(client.GetStream());
-				//byte[] buffer = new byte[1024];
+				NetworkTools networkTools = new NetworkTools(customClient.chatClient.GetStream());
 				while (true)
 				{
-					//int bytesRead = stream.Read(buffer, 0, buffer.Length);
-					//if (bytesRead == 0)
-					//{
-					//	// Клиент отключился
-					//	Console.WriteLine("Клиент отключился");
-					//	break;
-					//}
-
-					//string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-					string message = networkTools.getData();
+					string message = networkTools.TakeBytes().GetString();
 					Console.WriteLine($"Получено сообщение: {message}");
 
 					// Рассылаем сообщение всем в канале
-					foreach (var user in channel.ConnectedUsers)
+					foreach (CustomClient otherClients in channel.ConnectedUsers)
 					{
-						if (user != client)
+						TcpClient otherChatClient = otherClients.chatClient;
+						if (otherChatClient != customClient.chatClient)
 						{
-							NetworkTools networkToolsUser = new NetworkTools(user.GetStream());
-							networkToolsUser.sendData(message);
-							//byte[] data = Encoding.UTF8.GetBytes(message);
-							//userStream.Write(data, 0, data.Length);
+							NetworkTools networkToolsUser = new NetworkTools(otherChatClient.GetStream());
+							networkToolsUser.SendString(message);
 						}
 					}
 				}
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"Ошибка при обработке чата: {ex.Message}");
+				Console.WriteLine($"Ошибка при обработке чата: {ex.Message}.");
 			}
 			finally
 			{
@@ -106,11 +96,23 @@ namespace SquadVoiceServer
 			waveSource?.Dispose();
 
 			// Удаляем клиента из списка подключенных пользователей
-			channel.ConnectedUsers.Remove(client);
+			channel.ConnectedUsers.Remove(customClient);
+
+			// Освобождаем ресрурсы соединения с клиентом
+			customClient.techClient?.Dispose();
+			customClient.chatClient?.Dispose();
+			customClient.voiceClient?.Dispose();
+			customClient.videoClient?.Dispose();
+			customClient.deskClient?.Dispose();
 
 			// Закрываем соединение с клиентом
-			client.Close();
-			Console.WriteLine("Соединение с клиентом закрыто.");
+			customClient.techClient?.Close();
+			customClient.chatClient?.Close();
+			customClient.voiceClient?.Close();
+			customClient.videoClient?.Close();
+			customClient.deskClient?.Close();
+
+			Console.WriteLine($"Соединение с клиентом(ID: {customClient.ID.ToString()}, IP: {customClient.IP.ToString()}) закрыто.");
 		}
 	}
 }

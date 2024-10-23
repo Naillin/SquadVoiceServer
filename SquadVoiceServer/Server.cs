@@ -32,7 +32,7 @@ namespace SquadVoiceServer
 		{
 			listener = new TcpListener(IPAddress.Any, PORT_TECH);
 			listener.Start();
-			Console.WriteLine("Server started on port " + PORT_TECH);
+			Console.WriteLine($"Server started on port {PORT_TECH}.");
 
 			// Добавляем пример канала
 			channels.Add(new Channel { Name = "General" });
@@ -48,16 +48,17 @@ namespace SquadVoiceServer
 		private async void HandleClient(TcpClient client)
 		{
 			NetworkTools networkTools = new NetworkTools(client.GetStream());
-			if (Authorization(client)) { await networkTools.SendByteAsync((byte)1); } else { await networkTools.SendByteAsync((byte)0); return; }
+			int ID_user = Authorization(client);
+			if (ID_user != -1) { await networkTools.SendByteAsync((byte)1); } else { await networkTools.SendByteAsync((byte)0); return; }
 
 			// Получаем IP клиента
 			IPAddress clientIP = ((IPEndPoint)client.Client.RemoteEndPoint).Address;
-			Console.WriteLine($"Клиент авторизован с IP: {clientIP.ToString()}");
+			Console.WriteLine($"Клиент(ID: {ID_user.ToString()}, IP: {clientIP.ToString()}) авторизован.");
 
 			Console.WriteLine("Ожидание данных от клиента...");
 			await networkTools.TakeBytesAsync();
 			string channelName = networkTools.GetString();
-			Console.WriteLine($"Получено имя канала: {channelName}");
+			Console.WriteLine($"Получено имя канала: {channelName}.");
 
 			// Пример простого выбора канала
 			Channel selectedChannel = channels.FirstOrDefault(c => c.Name == channelName);
@@ -70,10 +71,7 @@ namespace SquadVoiceServer
 				TcpListener listenerVideo = new TcpListener(clientIP, PORT_VIDEO);
 				TcpListener listenerDesk = new TcpListener(clientIP, PORT_DESK);
 
-				listenerChat.Start();
-				listenerVoice.Start();
-				listenerVideo.Start();
-				listenerDesk.Start();
+				listenerChat.Start(); listenerVoice.Start(); listenerVideo.Start(); listenerDesk.Start();
 
 				// Ожидание подключений
 				TcpClient chatClient = await listenerChat.AcceptTcpClientAsync();
@@ -81,18 +79,22 @@ namespace SquadVoiceServer
 				TcpClient videoClient = await listenerVideo.AcceptTcpClientAsync();
 				TcpClient deskClient = await listenerDesk.AcceptTcpClientAsync();
 
-				ClientHandler clientHandler = new ClientHandler(client, selectedChannel); //переписать этот класс и принять всех клиентов.
+				CustomClient customClient = new CustomClient();
+				customClient.ID = ID_user;
+				customClient.IP = clientIP;
+				customClient.chatClient = chatClient;
+				customClient.voiceClient = voiceClient;
+				customClient.videoClient = videoClient;
+				customClient.deskClient = deskClient;
+				ClientHandler clientHandler = new ClientHandler(customClient, selectedChannel);
 				clientHandler.StartHandling();
 
 				// Закрываем слушатели, так как клиенты уже приняты - проверить закрываются ли они в итоге и доходит до них код.
-				listenerChat.Stop();
-				listenerVoice.Stop();
-				listenerVideo.Stop();
-				listenerDesk.Stop();
+				listenerChat.Stop(); listenerVoice.Stop(); listenerVideo.Stop(); listenerDesk.Stop();
 			}
 		}
 
-		private bool Authorization(TcpClient client)
+		private int Authorization(TcpClient client)
 		{
 			NetworkStream stream = client.GetStream();
 			NetworkTools networkTools = new NetworkTools(stream);
@@ -111,11 +113,11 @@ namespace SquadVoiceServer
 			User user = jsonTools.FindUserByUsername(login, userDatabase);
 			if (user != null && user.Password == password) // Условие для правильных данных
 			{
-				Console.WriteLine($"Вход одобрен {user.Username}"); return true;
+				Console.WriteLine($"Вход одобрен {user.Username}."); return user.ID;
 			}
 			else
 			{
-				Console.WriteLine("Вход отклонен"); return false;
+				Console.WriteLine("Вход отклонен."); return -1;
 			}
 		}
 
@@ -125,11 +127,20 @@ namespace SquadVoiceServer
 			if (File.Exists(filePathConfig))
 			{
 				string[] linesConfig = File.ReadAllLines(filePathConfig);
-				PORT_TECH = Convert.ToInt32(linesConfig[0].Split('=')[1]);  // Получаем значение port
+				PORT_TECH = Convert.ToInt32(linesConfig[0].Split('=')[1]);
+				PORT_CHAT = Convert.ToInt32(linesConfig[1].Split('=')[1]);
+				PORT_VOICE = Convert.ToInt32(linesConfig[2].Split('=')[1]);
+				PORT_VIDEO = Convert.ToInt32(linesConfig[3].Split('=')[1]);
+				PORT_DESK = Convert.ToInt32(linesConfig[4].Split('=')[1]);
 			}
 			else
 			{
-				File.WriteAllText(filePathConfig, $"port={PORT_TECH}");
+				string configTextDefault = $"port_tech=5555\r\n" +
+										   $"port_chat=5656\r\n" +
+										   $"port_voice=5757\r\n" +
+										   $"port_video=5858\r\n" +
+										   $"port_desk=5959";
+				File.WriteAllText(filePathConfig, configTextDefault);
 			}
 		}
 	}

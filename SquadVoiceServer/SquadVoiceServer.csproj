@@ -104,6 +104,7 @@
     <Compile Include="ClientHandler.cs" />
     <Compile Include="Data_Templates\Base\Channel.cs" />
     <Compile Include="Data_Templates\Base\Root.cs" />
+    <Compile Include="Data_Templates\CustomClient.cs" />
     <Compile Include="Data_Templates\User.cs" />
     <Compile Include="Data_Templates\UserDatabase.cs" />
     <Compile Include="Data_Templates\Base\Voice.cs" />
