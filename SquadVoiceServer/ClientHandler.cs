@@ -24,9 +24,23 @@ namespace SquadVoiceServer
 
 		public void StartHandling()
 		{
+			Task.Run(() => HandleTech());
 			// Обрабатываем сообщения от клиента (текст и аудио)
 			Task.Run(() => HandleAudio());
 			Task.Run(() => HandleChat());
+		}
+
+		private void HandleTech()
+		{
+			NetworkTools networkTools = new NetworkTools(customClient.techClient);
+			try
+			{
+				networkTools.AcceptDisconnect(customClient);
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Техническаыя ошибка: {ex.Message}.");
+			}
 		}
 
 		private void HandleAudio()
@@ -61,21 +75,28 @@ namespace SquadVoiceServer
 		{
 			try
 			{
-				NetworkTools networkTools = new NetworkTools(customClient.chatClient.GetStream());
+				NetworkTools networkTools = new NetworkTools(customClient.chatClient);
 				while (true)
 				{
 					string message = networkTools.TakeBytes().GetString();
-					Console.WriteLine($"Получено сообщение: {message}");
-
-					// Рассылаем сообщение всем в канале
-					foreach (CustomClient otherClients in channel.ConnectedUsers)
+					if (!string.IsNullOrEmpty(message))
 					{
-						TcpClient otherChatClient = otherClients.chatClient;
-						if (otherChatClient != customClient.chatClient)
+						Console.WriteLine($"Получено сообщение: {message}");
+
+						// Рассылаем сообщение всем в канале
+						foreach (CustomClient otherClients in channel.ConnectedUsers)
 						{
-							NetworkTools networkToolsUser = new NetworkTools(otherChatClient.GetStream());
-							networkToolsUser.SendString(message);
+							TcpClient otherChatClient = otherClients.chatClient;
+							if (otherChatClient != customClient.chatClient)
+							{
+								NetworkTools networkToolsUser = new NetworkTools(otherChatClient);
+								networkToolsUser.SendString(message);
+							}
 						}
+					}
+					else
+					{
+						break;
 					}
 				}
 			}
@@ -98,19 +119,26 @@ namespace SquadVoiceServer
 			// Удаляем клиента из списка подключенных пользователей
 			channel.ConnectedUsers.Remove(customClient);
 
-			// Освобождаем ресрурсы соединения с клиентом
-			customClient.techClient?.Dispose();
-			customClient.chatClient?.Dispose();
-			customClient.voiceClient?.Dispose();
-			customClient.videoClient?.Dispose();
-			customClient.deskClient?.Dispose();
+			////Уничтожаем сетевые потоки
+			//customClient.techClient?.GetStream()?.Close();
+			//customClient.chatClient?.GetStream()?.Close();
+			//customClient.voiceClient?.GetStream()?.Close();
+			//customClient.videoClient?.GetStream()?.Close();
+			//customClient.deskClient?.GetStream()?.Close();
 
-			// Закрываем соединение с клиентом
-			customClient.techClient?.Close();
-			customClient.chatClient?.Close();
-			customClient.voiceClient?.Close();
-			customClient.videoClient?.Close();
-			customClient.deskClient?.Close();
+			////Освобождаем ресрурсы соединения с клиентом
+			//customClient.techClient?.Dispose();
+			//customClient.chatClient?.Dispose();
+			//customClient.voiceClient?.Dispose();
+			//customClient.videoClient?.Dispose();
+			//customClient.deskClient?.Dispose();
+
+			////Закрываем соединение с клиентом
+			//customClient.techClient?.Close();
+			//customClient.chatClient?.Close();
+			//customClient.voiceClient?.Close();
+			//customClient.videoClient?.Close();
+			//customClient.deskClient?.Close();
 
 			Console.WriteLine($"Соединение с клиентом(ID: {customClient.ID.ToString()}, IP: {customClient.IP.ToString()}) закрыто.");
 		}

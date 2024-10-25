@@ -15,8 +15,8 @@ namespace SquadVoiceServer
 {
 	internal class Server
 	{
-		private static TcpListener listener;
-		private int PORT_TECH = 5555; // открыть порты в маршрутизаторе
+		private static TcpListener listenerTech;
+		private int PORT_TECH = 5555;
 		private int PORT_CHAT = 5656;
 		private int PORT_VOICE = 5757;
 		private int PORT_VIDEO = 5858;
@@ -30,8 +30,8 @@ namespace SquadVoiceServer
 
 		public void Start()
 		{
-			listener = new TcpListener(IPAddress.Any, PORT_TECH);
-			listener.Start();
+			//listenerTech = new TcpListener(IPAddress.Any, PORT_TECH);
+			//listenerTech.Start();
 			Console.WriteLine($"Server started on port {PORT_TECH}.");
 
 			// Добавляем пример канала
@@ -40,24 +40,33 @@ namespace SquadVoiceServer
 
 			while (true)
 			{
-				TcpClient client = listener.AcceptTcpClient();
+				//TcpClient client = listenerTech.AcceptTcpClient();
+				TcpClient client = new NetworkTools().AcceptConnection(PORT_TECH);
 				Task.Run(() => HandleClient(client)); // Обрабатываем клиента в отдельном потоке
 			}
 		}
 
-		private async void HandleClient(TcpClient client)
+		private void HandleClient(TcpClient client)
 		{
-			NetworkTools networkTools = new NetworkTools(client.GetStream());
+			NetworkTools networkTools = new NetworkTools(client);
 			int ID_user = Authorization(client);
-			if (ID_user != -1) { await networkTools.SendByteAsync((byte)1); } else { await networkTools.SendByteAsync((byte)0); return; }
+			if (ID_user != -1) { networkTools.SendByte((byte)1); } else { networkTools.SendByte((byte)0); return; }
 
 			// Получаем IP клиента
-			IPAddress clientIP = ((IPEndPoint)client.Client.RemoteEndPoint).Address;
+			IPAddress clientIP = networkTools.GetIP();
 			Console.WriteLine($"Клиент(ID: {ID_user.ToString()}, IP: {clientIP.ToString()}) авторизован.");
 
+			CustomClient customClient = new CustomClient();
+			customClient.ID = ID_user;
+			customClient.IP = clientIP;
+			customClient.techClient = client;
+			customClient.chatClient = networkTools.GetClient(clientIP, PORT_CHAT);
+			customClient.voiceClient = networkTools.GetClient(clientIP, PORT_VOICE);
+			customClient.videoClient = networkTools.GetClient(clientIP, PORT_VIDEO);
+			customClient.deskClient = networkTools.GetClient(clientIP, PORT_DESK);
+
 			Console.WriteLine("Ожидание данных от клиента...");
-			await networkTools.TakeBytesAsync();
-			string channelName = networkTools.GetString();
+			string channelName = networkTools.TakeBytes().GetString();
 			Console.WriteLine($"Получено имя канала: {channelName}.");
 
 			// Пример простого выбора канала
@@ -66,38 +75,14 @@ namespace SquadVoiceServer
 			{
 				Console.WriteLine($"Клиент {clientIP.ToString()} обслуживается.");
 
-				TcpListener listenerChat = new TcpListener(clientIP, PORT_CHAT);
-				TcpListener listenerVoice = new TcpListener(clientIP, PORT_VOICE);
-				TcpListener listenerVideo = new TcpListener(clientIP, PORT_VIDEO);
-				TcpListener listenerDesk = new TcpListener(clientIP, PORT_DESK);
-
-				listenerChat.Start(); listenerVoice.Start(); listenerVideo.Start(); listenerDesk.Start();
-
-				// Ожидание подключений
-				TcpClient chatClient = await listenerChat.AcceptTcpClientAsync();
-				TcpClient voiceClient = await listenerVoice.AcceptTcpClientAsync();
-				TcpClient videoClient = await listenerVideo.AcceptTcpClientAsync();
-				TcpClient deskClient = await listenerDesk.AcceptTcpClientAsync();
-
-				CustomClient customClient = new CustomClient();
-				customClient.ID = ID_user;
-				customClient.IP = clientIP;
-				customClient.chatClient = chatClient;
-				customClient.voiceClient = voiceClient;
-				customClient.videoClient = videoClient;
-				customClient.deskClient = deskClient;
 				ClientHandler clientHandler = new ClientHandler(customClient, selectedChannel);
 				clientHandler.StartHandling();
-
-				// Закрываем слушатели, так как клиенты уже приняты - проверить закрываются ли они в итоге и доходит до них код.
-				listenerChat.Stop(); listenerVoice.Stop(); listenerVideo.Stop(); listenerDesk.Stop();
 			}
 		}
 
 		private int Authorization(TcpClient client)
 		{
-			NetworkStream stream = client.GetStream();
-			NetworkTools networkTools = new NetworkTools(stream);
+			NetworkTools networkTools = new NetworkTools(client);
 			string loginPass = networkTools.TakeBytes().GetString();
 			Console.WriteLine($"Попытка входа: {loginPass}");
 
