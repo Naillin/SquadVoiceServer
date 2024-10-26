@@ -24,13 +24,13 @@ namespace SquadVoiceServer
 
 		public void StartHandling()
 		{
-			Task.Run(() => HandleTech());
+			Task.Run(() => HandleTechDisconnect());
 			// Обрабатываем сообщения от клиента (текст и аудио)
 			Task.Run(() => HandleAudio());
 			Task.Run(() => HandleChat());
 		}
 
-		private void HandleTech()
+		private void HandleTechDisconnect()
 		{
 			NetworkTools networkTools = new NetworkTools(customClient.techClient);
 			try

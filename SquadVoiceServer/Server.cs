@@ -65,6 +65,10 @@ namespace SquadVoiceServer
 			customClient.videoClient = networkTools.GetClient(clientIP, PORT_VIDEO);
 			customClient.deskClient = networkTools.GetClient(clientIP, PORT_DESK);
 
+			Console.WriteLine("Отправка каналов клиенту...");
+			string channelNames = string.Join(";", channels.Select(channel => channel.Name));
+			networkTools.SendString(channelNames);
+
 			Console.WriteLine("Ожидание данных от клиента...");
 			string channelName = networkTools.TakeBytes().GetString();
 			Console.WriteLine($"Получено имя канала: {channelName}.");
