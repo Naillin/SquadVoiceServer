@@ -37,6 +37,18 @@ namespace SquadVoiceServer
 			return userDatabase.Users.Find(user => user.Username == username); // Поиск пользователя по имени
 		}
 
+		public User FindUserByID(int ID, UserDatabase userDatabase)
+		{
+			return userDatabase.Users.Find(user => user.ID == ID); // Поиск пользователя по ID
+		}
+
+		public string[] GetNameUsers(UserDatabase userDatabase)
+		{
+			return userDatabase.Users
+							   .Select(user => user.Username) // Извлечение имени пользователей
+							   .ToArray();                    // Преобразование в массив
+		}
+
 		public int GetNextAvailableId(UserDatabase userDatabase)
 		{
 			if (userDatabase.Users.Count == 0)

@@ -15,7 +15,6 @@ namespace SquadVoiceServer
 {
 	internal class Server
 	{
-		private static TcpListener listenerTech;
 		private int PORT_TECH = 5555;
 		private int PORT_CHAT = 5656;
 		private int PORT_VOICE = 5757;
@@ -30,8 +29,6 @@ namespace SquadVoiceServer
 
 		public void Start()
 		{
-			//listenerTech = new TcpListener(IPAddress.Any, PORT_TECH);
-			//listenerTech.Start();
 			Console.WriteLine($"Server started on port {PORT_TECH}.");
 
 			// Добавляем пример канала
@@ -40,7 +37,6 @@ namespace SquadVoiceServer
 
 			while (true)
 			{
-				//TcpClient client = listenerTech.AcceptTcpClient();
 				TcpClient client = new NetworkTools().AcceptConnection(PORT_TECH);
 				Task.Run(() => HandleClient(client)); // Обрабатываем клиента в отдельном потоке
 			}
