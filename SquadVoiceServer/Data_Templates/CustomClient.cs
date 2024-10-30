@@ -8,7 +8,7 @@ using System.Net;
 
 namespace SquadVoiceServer.Data_Templates
 {
-	public struct CustomClient
+	public class CustomClient
 	{
 		public int ID;
 		public IPAddress IP;
@@ -18,7 +18,7 @@ namespace SquadVoiceServer.Data_Templates
 		public TcpClient videoClient;
 		public TcpClient deskClient;
 
-		CustomClient(int ID, IPAddress IP, TcpClient techClient, TcpClient chatClient, TcpClient voiceClient, TcpClient videoClient, TcpClient deskClient)
+		public CustomClient(int ID, IPAddress IP, TcpClient techClient, TcpClient chatClient, TcpClient voiceClient, TcpClient videoClient, TcpClient deskClient)
 		{
 			this.ID = ID;
 			this.IP = IP;
@@ -27,6 +27,30 @@ namespace SquadVoiceServer.Data_Templates
 			this.voiceClient = voiceClient;
 			this.videoClient = videoClient;
 			this.deskClient = deskClient;
+		}
+
+		public void Close()
+		{
+			//Уничтожаем сетевые потоки
+			//this.techClient?.GetStream()?.Close();
+			//this.chatClient?.GetStream()?.Close();
+			//this.voiceClient?.GetStream()?.Close();
+			//this.videoClient?.GetStream()?.Close();
+			//this.deskClient?.GetStream()?.Close();
+
+			//Освобождаем ресрурсы соединения с клиентом
+			this.techClient?.Dispose();
+			this.chatClient?.Dispose();
+			this.voiceClient?.Dispose();
+			this.videoClient?.Dispose();
+			this.deskClient?.Dispose();
+
+			//Закрываем соединение с клиентом
+			this.techClient?.Close();
+			this.chatClient?.Close();
+			this.voiceClient?.Close();
+			this.videoClient?.Close();
+			this.deskClient?.Close();
 		}
 	}
 }

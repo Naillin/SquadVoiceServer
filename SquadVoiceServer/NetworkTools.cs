@@ -12,10 +12,18 @@ using System.Threading.Tasks;
 
 namespace SquadVoiceServer
 {
+	//////////////////////////////////////// СДЕЛАТЬ УНИЧТОЖЕНИЕ КЛИЕНТА НА TakeBytes ЕСЛИ ОН СОРВАЛ СОЕДИНЕНИЕ!!!!!!!!!!!!!
+	/// <summary>
+	/// Инструментарий для работы с TCP-соединениями.
+	/// </summary>
 	internal class NetworkTools
 	{
 		private TcpClient _client;
 		private NetworkStream _stream;
+		/// <summary>
+		/// Инструментарий для работы с TCP-соединениями.
+		/// </summary>
+		/// <param name="client">Клиентское подключение через протокол TCP.</param>
 		public NetworkTools(TcpClient client = null)
 		{
 			_client = client;
@@ -23,6 +31,10 @@ namespace SquadVoiceServer
 		}
 
 		private byte[] bufferOut;
+		/// <summary>
+		/// Получает байты информации от источника в сетевом потоке.
+		/// </summary>
+		/// <returns>Экземпляр собственного класса.</returns>
 		public NetworkTools TakeBytes()
 		{
 			if (_stream == null)
@@ -42,7 +54,10 @@ namespace SquadVoiceServer
 			return this;
 		}
 
-		// Асинхронный метод для принятия пакетов
+		/// <summary>
+		/// Асинхронно получает байты информации от источника в сетевом потоке.
+		/// </summary>
+		/// <returns>Задачу в виде экземпляра собственного класса.</returns>
 		public async Task<NetworkTools> TakeBytesAsync()
 		{
 			if (_stream == null)
@@ -62,74 +77,118 @@ namespace SquadVoiceServer
 			return this;
 		}
 
+		/// <summary>
+		/// Возвращает полученные байты.
+		/// </summary>
+		/// <returns>Массив байтов.</returns>
 		public byte[] GetBytes() { return bufferOut; }
 
+		/// <summary>
+		/// Возвращает декодированную строку из полученных байтов.
+		/// </summary>
+		/// <returns>Строка содержащая сообщение.</returns>
 		public string GetString()
 		{
 			return Encoding.UTF8.GetString(bufferOut);
 		}
 
+		/// <summary>
+		/// Возвращает булевое значение из полученных байтов.
+		/// </summary>
+		/// <returns>Значение булевого типа данных.</returns>
 		public bool GetBool()
 		{
 			// Если первый байт 0, вернём false, иначе true
 			return bufferOut.Length > 0 && bufferOut[0] != 0;
 		}
 
+		/// <summary>
+		/// Возвращает целочисленное значение из полученных байтов.
+		/// </summary>
+		/// <returns>Целое число.</returns>
 		public int GetInt()
 		{
 			return BitConverter.ToInt32(bufferOut, 0);
 		}
 
+		/// <summary>
+		/// Возвращает вещественное значение из полученных байтов.
+		/// </summary>
+		/// <returns>Число с плавающей точкой.</returns>
 		public double GetDouble()
 		{
 			return BitConverter.ToDouble(bufferOut, 0);
 		}
 
+		/// <summary>
+		/// Отправляет строку сообщения в сетевой поток.
+		/// </summary>
+		/// <param name="data">Строка сообщения.</param>
 		public void SendString(string data)
 		{
 			byte[] messageBytes = Encoding.UTF8.GetBytes(data);
 			_stream.Write(messageBytes, 0, messageBytes.Length);
 		}
 
-		public void SendByte(byte data)
+		/// <summary>
+		/// Отправляет массив байтов в сетевой поток.
+		/// </summary>
+		/// <param name="data">Массив байтов.</param>
+		public void SendByte(byte[] data)
 		{
-			byte[] responseData = new byte[] { data };
-			_stream.Write(responseData, 0, responseData.Length);
+			_stream.Write(data, 0, data.Length);
 		}
 
-		// Асинхронный метод для отправки строки
+		/// <summary>
+		/// Асинхронно отправляет строку сообщения в сетевой поток.
+		/// </summary>
+		/// <param name="data">Строка сообщения.</param>
 		public async Task SendStringAsync(string data)
 		{
 			byte[] messageBytes = Encoding.UTF8.GetBytes(data);
 			await _stream.WriteAsync(messageBytes, 0, messageBytes.Length);
 		}
 
-		public async Task SendByteAsync(byte data)
+		/// <summary>
+		/// Асинхронно отправляет массив байтов в сетевой поток.
+		/// </summary>
+		/// <param name="data">Байты.</param>
+		public async Task SendByteAsync(byte[] data)
 		{
-			byte[] responseData = new byte[] { data };
-			await _stream.WriteAsync(responseData, 0, responseData.Length);
+			await _stream.WriteAsync(data, 0, data.Length);
 		}
 
+		/// <summary>
+		/// Применить клиента к текущему экземпляру класса.
+		/// </summary>
+		/// <param name="client">Применяемый клиент.</param>
 		private void ApplyClient(TcpClient client)
 		{
 			_client = client;
 			_stream = _client?.GetStream();
 		}
 
-		// Метод для закрытия клиента
+		/// <summary>
+		/// Закрыть TCP-соединение текущего клиента.
+		/// </summary>
 		public void CloseClient()
 		{
 			_client?.Dispose();
 			_client?.Close();
 		}
 
-		// Метод для закрытия потока
+		/// <summary>
+		/// Закрыть поток текущего клиента.
+		/// </summary>
 		public void CloseStream()
 		{
 			_stream?.Dispose();
 			_stream?.Close();
 		}
 
+		/// <summary>
+		/// Строка представляющая код для проверки соединений (по умолчанию "SquadVoice").
+		/// </summary>
 		static public string connectionCode
 		{
 			get { return _connectionCode; }
@@ -142,6 +201,12 @@ namespace SquadVoiceServer
 			}
 		}
 		private static string _connectionCode = "SquadVoice";
+		/// <summary>
+		/// Принимает подключение клиента.
+		/// </summary>
+		/// <param name="port">Прослушиваемый порт.</param>
+		/// <param name="apply">Применение полученного клиента к экземпляру класса (по умолчанию false).</param>
+		/// <returns>Клиентское подключение через протокол TCP.</returns>
 		public TcpClient AcceptConnection(int port, bool apply = false)
 		{
 			TcpClient result = null;
@@ -158,6 +223,13 @@ namespace SquadVoiceServer
 			else { listener.Stop(); result.Close(); return null; }
 		}
 
+		/// <summary>
+		/// Выполняет запрос на подключение к удаленному хосту.
+		/// </summary>
+		/// <param name="ip">Адрес хоста.</param>
+		/// <param name="port">Порт хоста.</param>
+		/// <param name="apply">Применение полученного клиента к экземпляру класса (по умолчанию false).</param>
+		/// <returns>Клиентское подключение через протокол TCP.</returns>
 		public TcpClient TryConnection(IPAddress ip, int port, bool apply = false)
 		{
 			TcpClient result = new TcpClient(ip.ToString(), port);
@@ -167,14 +239,24 @@ namespace SquadVoiceServer
 			return result;
 		}
 
-		// Получение IP-адреса
+		/// <summary>
+		/// Возвращает адрес подключенного источника.
+		/// </summary>
+		/// <param name="client">Клиентское подключение через протокол TCP (по умолчанию null).</param>
+		/// <returns>Адрес клиента экземпляра класса, в противном случае адрес указанного клиента.</returns>
 		public IPAddress GetIP(TcpClient client = null)
 		{
 			if (client == null) { return ((IPEndPoint)_client.Client.RemoteEndPoint).Address; }
 			else { return ((IPEndPoint)client.Client.RemoteEndPoint).Address; }
 		}
 
-		// Прослушивание конкретного IP и возврат клиента
+		/// <summary>
+		/// Прослушивание подключения на конкретном адресе и порте. 
+		/// </summary>
+		/// <param name="ip">Адрес клиента.</param>
+		/// <param name="port">Порт клиента.</param>
+		/// <param name="apply">Применение полученного клиента к экземпляру класса (по умолчанию false).</param>
+		/// <returns>Клиентское подключение через протокол TCP.</returns>
 		public TcpClient GetClient(IPAddress ip, int port, bool apply = false)
 		{
 			TcpClient result = null;
@@ -190,6 +272,25 @@ namespace SquadVoiceServer
 
 			if (apply) ApplyClient(result);
 			return result;
+		}
+
+		/// <summary>
+		/// Выполняет переданную операцию при получении указанного кода от источника.
+		/// </summary>
+		/// <param name="code">Код операции.</param>
+		/// <param name="operation">Передаваемая операция.</param>
+		/// <param name="cancellationToken">Токен завершающий операцию если активирован флаг цикличного выполнения.</param>
+		/// <param name="cycle">Флаг активирующий цикличное выполнение операции.</param>
+		public void OperationByCode(string code, Action operation, CancellationToken cancellationToken, bool cycle = false)
+		{
+			while (cycle && !cancellationToken.IsCancellationRequested)
+			{
+				string data = this.TakeBytes().GetString();
+				if (data.Equals(code))
+				{
+					operation();
+				}
+			}
 		}
 
 		///////////////////////////////////////////////////////////////////////////////

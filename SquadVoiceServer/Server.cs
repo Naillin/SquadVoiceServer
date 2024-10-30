@@ -5,8 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.InteropServices.ComTypes;
-using System.Runtime.Remoting.Messaging;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -46,38 +44,28 @@ namespace SquadVoiceServer
 		{
 			NetworkTools networkTools = new NetworkTools(client);
 			int ID_user = Authorization(client);
-			if (ID_user != -1) { networkTools.SendByte((byte)1); } else { networkTools.SendByte((byte)0); return; }
+			if (ID_user != -1) { networkTools.SendByte(BitConverter.GetBytes(1)); } else { networkTools.SendByte(BitConverter.GetBytes(0)); return; }
 
 			// Получаем IP клиента
 			IPAddress clientIP = networkTools.GetIP();
 			Console.WriteLine($"Клиент(ID: {ID_user.ToString()}, IP: {clientIP.ToString()}) авторизован.");
 
-			CustomClient customClient = new CustomClient();
-			customClient.ID = ID_user;
-			customClient.IP = clientIP;
-			customClient.techClient = client;
-			customClient.chatClient = networkTools.GetClient(clientIP, PORT_CHAT);
-			customClient.voiceClient = networkTools.GetClient(clientIP, PORT_VOICE);
-			customClient.videoClient = networkTools.GetClient(clientIP, PORT_VIDEO);
-			customClient.deskClient = networkTools.GetClient(clientIP, PORT_DESK);
+			CustomClient customClient = new CustomClient(
+				ID_user,
+				clientIP,
+				client,
+				networkTools.GetClient(clientIP, PORT_CHAT),
+				networkTools.GetClient(clientIP, PORT_VOICE),
+				networkTools.GetClient(clientIP, PORT_VIDEO),
+				networkTools.GetClient(clientIP, PORT_DESK)
+				);
 
 			Console.WriteLine("Отправка каналов клиенту...");
 			string channelNames = string.Join(";", channels.Select(channel => channel.Name));
 			networkTools.SendString(channelNames);
 
-			Console.WriteLine("Ожидание данных от клиента...");
-			string channelName = networkTools.TakeBytes().GetString();
-			Console.WriteLine($"Получено имя канала: {channelName}.");
-
-			// Пример простого выбора канала
-			Channel selectedChannel = channels.FirstOrDefault(c => c.Name == channelName);
-			if (selectedChannel != null)
-			{
-				Console.WriteLine($"Клиент {clientIP.ToString()} обслуживается.");
-
-				ClientHandler clientHandler = new ClientHandler(customClient, selectedChannel);
-				clientHandler.StartHandling();
-			}
+			ClientHandler clientHandler = new ClientHandler(customClient, channels);
+			clientHandler.StartHandling();
 		}
 
 		private int Authorization(TcpClient client)
