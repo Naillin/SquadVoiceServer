@@ -189,7 +189,7 @@ namespace SquadVoiceServer
 		/// <summary>
 		/// Строка представляющая код для проверки соединений (по умолчанию "SquadVoice").
 		/// </summary>
-		static public string connectionCode
+		public static string connectionCode
 		{
 			get { return _connectionCode; }
 			set

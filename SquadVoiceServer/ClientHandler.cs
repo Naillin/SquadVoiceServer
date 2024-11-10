@@ -13,19 +13,25 @@ namespace SquadVoiceServer
 {
 	internal class ClientHandler
 	{
-		private CustomClient customClient;
-		private List<Channel> channels;
+		private CustomClient customClient_;
+		private Root root_;
+		private UserDatabase userDatabase_;
 		private Channel selectedChannel;
 
-		public ClientHandler(CustomClient customClient, List<Channel> channels)
+		public ClientHandler(CustomClient customClient, Root root, UserDatabase userDatabase)
 		{
-			this.customClient = customClient;
-			this.channels = channels;
+			this.customClient_ = customClient;
+			this.root_ = root;
+			this.userDatabase_ = userDatabase;
 		}
 
+		JSONTools jSONTools;
 		public void StartHandling()
 		{
+			jSONTools = new JSONTools();
+
 			TakeChannelName();
+			LastMassages();
 
 			// Обрабатываем сообщения от клиента (текст и аудио)
 			Task.Run(() => HandleAudio());
@@ -38,17 +44,31 @@ namespace SquadVoiceServer
 
 		private void TakeChannelName()
 		{
-			NetworkTools networkTools = new NetworkTools(customClient.techClient);
-			Console.WriteLine($"Ожидание данных от клиента {customClient.ID}...");
-			string channelName = networkTools.TakeBytes().GetString();
-			Console.WriteLine($"Получено имя канала: {channelName}. Клиент {customClient.IP.ToString()} обслуживается.");
-
-			// Пример простого выбора канала
-			selectedChannel = channels.FirstOrDefault(c => c.Name == channelName);
-			lock (selectedChannel.ConnectedUsers) // Блокируем доступ к списку ConnectedUsers
+			NetworkTools networkTools = new NetworkTools(customClient_.techClient);
+			Console.WriteLine($"Ожидание данных от клиента {customClient_.ID}...");
+			try
 			{
-				selectedChannel.ConnectedUsers.Add(customClient); // Добавляем пользователя в канал
+				string channelName = networkTools.TakeBytes().GetString();
+				Console.WriteLine($"Получено имя канала: {channelName}. Клиент {customClient_.IP.ToString()} обслуживается.");
+
+				// Пример простого выбора канала
+				selectedChannel = root_.Channels.FirstOrDefault(c => c.Name == channelName);
+				lock (selectedChannel.ConnectedUsers) // Блокируем доступ к списку ConnectedUsers
+				{
+					selectedChannel.ConnectedUsers.Add(customClient_); // Добавляем пользователя в канал
+				}
 			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Техническая ошибка: {ex.Message}.");
+			}
+		}
+
+		private void LastMassages()
+		{
+			string chat = string.Join(Environment.NewLine, selectedChannel.Chat);
+			NetworkTools networkTools = new NetworkTools(customClient_.chatClient);
+			networkTools.SendString(chat);
 		}
 
 		private string channelChangeCode = "ChannelChange";
@@ -56,15 +76,15 @@ namespace SquadVoiceServer
 		{
 			CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
 			CancellationToken token = cancellationTokenSource.Token;
-			NetworkTools networkTools = new NetworkTools(customClient.techClient);
 			try
 			{
+				NetworkTools networkTools = new NetworkTools(customClient_.techClient);
 				networkTools.OperationByCode(channelChangeCode, () =>
 				{
 					// Удаляем клиента из списка подключенных пользователей
 					lock (selectedChannel.ConnectedUsers) // Блокируем доступ к списку ConnectedUsers
 					{
-						selectedChannel.ConnectedUsers.Remove(customClient);
+						selectedChannel.ConnectedUsers.Remove(customClient_);
 					}
 					StartHandling();
 				}, token, true);
@@ -79,10 +99,10 @@ namespace SquadVoiceServer
 
 		private void HandleTechDisconnect()
 		{
-			NetworkTools networkTools = new NetworkTools(customClient.techClient);
 			try
 			{
-				networkTools.AcceptDisconnect(customClient);
+				NetworkTools networkTools = new NetworkTools(customClient_.techClient);
+				networkTools.AcceptDisconnect(customClient_);
 			}
 			catch (Exception ex)
 			{
@@ -94,7 +114,7 @@ namespace SquadVoiceServer
 		{
 			try
 			{
-				NetworkTools networkTools = new NetworkTools(customClient.techClient);
+				NetworkTools networkTools = new NetworkTools(customClient_.techClient);
 				JSONTools jsonTools = new JSONTools();
 				UserDatabase userDatabase = jsonTools.LoadUsers();
 
@@ -196,21 +216,19 @@ namespace SquadVoiceServer
 		{
 			try
 			{
-				NetworkTools networkTools = new NetworkTools(customClient.voiceClient);
+				NetworkTools networkTools = new NetworkTools(customClient_.voiceClient);
 				while (true)
 				{
 					byte[] voiceArray = networkTools.TakeBytes().GetBytes();
 					if (voiceArray != null && voiceArray.Length > 0)
 					{
-						//Console.WriteLine($"Получено сообщение: {message}");
-
 						// Рассылаем сообщение всем в канале
 						List<CustomClient> clientsToNotify;
 						// Блокируем список при доступе к нему
 						lock (selectedChannel.ConnectedUsers)
 						{
 							clientsToNotify = selectedChannel.ConnectedUsers
-								.Where(otherClient => otherClient.ID != customClient.ID)
+								.Where(otherClient => otherClient.ID != customClient_.ID)
 								.ToList(); // Получаем список клиентов для рассылки
 						}
 
@@ -218,6 +236,7 @@ namespace SquadVoiceServer
 						{
 							try
 							{
+								Console.WriteLine($"Клиент {customClient_.ID} отправлеяет голос клиенту {otherClient.ID}");
 								NetworkTools networkToolsUser = new NetworkTools(otherClient.voiceClient);
 								networkToolsUser.SendByte(voiceArray);
 							}
@@ -242,15 +261,23 @@ namespace SquadVoiceServer
 
 		private void HandleChat()
 		{
+			User CurrentUser = jSONTools.FindUserByID(customClient_.ID, userDatabase_);
 			try
 			{
-				NetworkTools networkTools = new NetworkTools(customClient.chatClient);
+				NetworkTools networkTools = new NetworkTools(customClient_.chatClient);
 				while (true)
 				{
 					string message = networkTools.TakeBytes().GetString();
 					if (!string.IsNullOrEmpty(message))
 					{
-						Console.WriteLine($"Получено сообщение: {message}");
+						
+						Console.WriteLine($"Получено сообщение: {message}. Клиент: {CurrentUser.Username}");
+						string sendMessage = $"{CurrentUser.Username}: {message}";
+						lock (selectedChannel)
+						{
+							selectedChannel.Chat.Add(sendMessage);
+							jSONTools.SaveChannel(selectedChannel, root_);
+						}
 
 						// Рассылаем сообщение всем в канале
 						List<CustomClient> clientsToNotify;
@@ -259,7 +286,7 @@ namespace SquadVoiceServer
 						lock (selectedChannel.ConnectedUsers)
 						{
 							clientsToNotify = selectedChannel.ConnectedUsers
-								.Where(otherClient => otherClient.ID != customClient.ID)
+								.Where(otherClient => otherClient.ID != customClient_.ID)
 								.ToList(); // Получаем список клиентов для рассылки
 						}
 
@@ -268,7 +295,7 @@ namespace SquadVoiceServer
 							try
 							{
 								NetworkTools networkToolsUser = new NetworkTools(otherClient.chatClient);
-								networkToolsUser.SendString(message);
+								networkToolsUser.SendString(sendMessage);
 							}
 							catch (Exception ex)
 							{
@@ -300,11 +327,11 @@ namespace SquadVoiceServer
 			//waveSource?.Dispose();
 
 			// Удаляем клиента из списка подключенных пользователей
-			selectedChannel.ConnectedUsers.Remove(customClient);
+			selectedChannel.ConnectedUsers.Remove(customClient_);
 
-			customClient.Close();
+			customClient_.Close();
 
-			Console.WriteLine($"Соединение с клиентом(ID: {customClient.ID.ToString()}, IP: {customClient.IP.ToString()}) закрыто.");
+			Console.WriteLine($"Соединение с клиентом(ID: {customClient_.ID.ToString()}, IP: {customClient_.IP.ToString()}) закрыто.");
 		}
 	}
 }

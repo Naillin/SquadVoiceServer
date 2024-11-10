@@ -18,7 +18,8 @@ namespace SquadVoiceServer
 		private int PORT_VOICE = 5757;
 		private int PORT_VIDEO = 5858;
 		private int PORT_DESK = 5959;
-		private static List<Channel> channels = new List<Channel>(); // Список всех каналов
+		static private Root root;
+		UserDatabase userDatabase;
 
 		public Server() 
 		{
@@ -29,9 +30,11 @@ namespace SquadVoiceServer
 		{
 			Console.WriteLine($"Server started on port {PORT_TECH}.");
 
-			// Добавляем пример канала
-			channels.Add(new Channel { Name = "General" });
-			channels.Add(new Channel { Name = "Gaming" });
+			// Чтение корня каналов
+			JSONTools jSONTools = new JSONTools();
+			root = jSONTools.LoadRoot();
+			userDatabase = jSONTools.LoadUsers();
+			Console.WriteLine($"Loaded channels {string.Join(", ", root.Channels.Select(channel => channel.Name))}.");
 
 			while (true)
 			{
@@ -58,13 +61,13 @@ namespace SquadVoiceServer
 				networkTools.GetClient(clientIP, PORT_VOICE),
 				networkTools.GetClient(clientIP, PORT_VIDEO),
 				networkTools.GetClient(clientIP, PORT_DESK)
-				);
+			);
 
 			Console.WriteLine("Отправка каналов клиенту...");
-			string channelNames = string.Join(";", channels.Select(channel => channel.Name));
-			networkTools.SendString(channelNames);
+			string channelsNames = string.Join(";", root.Channels.Select(channel => channel.Name));
+			networkTools.SendString(channelsNames);
 
-			ClientHandler clientHandler = new ClientHandler(customClient, channels);
+			ClientHandler clientHandler = new ClientHandler(customClient, root, userDatabase);
 			clientHandler.StartHandling();
 		}
 
