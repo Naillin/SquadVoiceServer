@@ -53,22 +53,51 @@ namespace SquadVoiceServer
 
 				// Пример простого выбора канала
 				selectedChannel = root_.Channels.FirstOrDefault(c => c.Name == channelName);
-				lock (selectedChannel.ConnectedUsers) // Блокируем доступ к списку ConnectedUsers
+				if (selectedChannel != null)
 				{
-					selectedChannel.ConnectedUsers.Add(customClient_); // Добавляем пользователя в канал
+					lock (selectedChannel.ConnectedUsers) // Блокируем доступ к списку ConnectedUsers
+					{
+						selectedChannel.AddUser(customClient_); // Добавляем пользователя в канал
+					}
 				}
+				else
+				{
+					StopHandling();
+				}
+				
 			}
 			catch (Exception ex)
 			{
 				Console.WriteLine($"Техническая ошибка: {ex.Message}.");
+				StopHandling();
 			}
 		}
 
 		private void LastMassages()
 		{
-			string chat = string.Join(Environment.NewLine, selectedChannel.Chat);
-			NetworkTools networkTools = new NetworkTools(customClient_.chatClient);
-			networkTools.SendString(chat);
+			try
+			{
+				List<string> chatList = new List<string>();
+				if (selectedChannel != null)
+				{
+					lock (selectedChannel.Chat) // Блокируем доступ к списку ConnectedUsers
+					{
+						chatList = selectedChannel.Chat; // Добавляем пользователя в канал
+					}
+					string chat = string.Join(Environment.NewLine, chatList);
+					NetworkTools networkTools = new NetworkTools(customClient_.chatClient);
+					networkTools.SendString(chat);
+				}
+				else
+				{
+					StopHandling();
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Техническая ошибка: {ex.Message}.");
+				StopHandling();
+			}
 		}
 
 		private string channelChangeCode = "ChannelChange";
@@ -103,14 +132,18 @@ namespace SquadVoiceServer
 			{
 				NetworkTools networkTools = new NetworkTools(customClient_.techClient);
 				networkTools.AcceptDisconnect(customClient_);
+
+				selectedChannel?.ConnectedUsers.Remove(customClient_);
+				Console.WriteLine($"Соединение с клиентом(ID: {customClient_.ID.ToString()}, IP: {customClient_.IP.ToString()}) закрыто.");
 			}
 			catch (Exception ex)
 			{
 				Console.WriteLine($"Техническая ошибка: {ex.Message}.");
+				StopHandling();
 			}
 		}
 
-		private void HandleTechConnectedClients() //переделать, что бы посылать только когда ConnectedUsers изменяется
+		private void HandleTechConnectedClients()
 		{
 			try
 			{
@@ -322,12 +355,8 @@ namespace SquadVoiceServer
 
 		public void StopHandling()
 		{
-			// Останавливаем захват аудио и освобождаем ресурсы
-			//waveSource?.StopRecording();
-			//waveSource?.Dispose();
-
 			// Удаляем клиента из списка подключенных пользователей
-			selectedChannel.ConnectedUsers.Remove(customClient_);
+			selectedChannel?.ConnectedUsers.Remove(customClient_);
 
 			customClient_.Close();
 
